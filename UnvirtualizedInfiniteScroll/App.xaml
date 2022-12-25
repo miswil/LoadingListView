@@ -1,0 +1,22 @@
+﻿<Application x:Class="UnvirtualizedInfiniteScroll.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:UnvirtualizedInfiniteScroll"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ControlTemplate x:Key="InfiniteScrollListViewTemplate" TargetType="{x:Type ListView}">
+            <Border Name="Border"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    Background="{TemplateBinding Background}">
+                <ScrollViewer x:Name="OuterScroll">
+                    <StackPanel>
+                        <ItemsPresenter Name="ItemsPresenter"/>
+                        <ContentControl x:Name="PART_Load"
+                                    ContentTemplate="{Binding Path=(local:InfiniteScrollListView.LoadTemplate), RelativeSource={RelativeSource TemplatedParent}}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </ControlTemplate>
+    </Application.Resources>
+</Application>

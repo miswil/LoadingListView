@@ -1,0 +1,138 @@
+﻿<Window x:Class="UniformVirtualizingInfiniteScroll.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:UniformVirtualizingInfiniteScroll"
+        d:DataContext="{d:DesignInstance Type=local:MainWindowViewModel}"
+        mc:Ignorable="d"
+        Title="{Binding Jokes.Count, StringFormat={}{0} Jokes}" Height="450" Width="800">
+    <Window.DataContext>
+        <local:MainWindowViewModel/>
+    </Window.DataContext>
+    <Window.Resources>
+        <CollectionViewSource x:Key="Jokes" Source="{Binding Jokes}">
+        </CollectionViewSource>
+        <CollectionViewSource x:Key="GroupedJokes" Source="{Binding Jokes}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Type"/>
+            </CollectionViewSource.GroupDescriptions>
+        </CollectionViewSource>
+        <DataTemplate x:Key="LoadingTemplate">
+            <Border Background="Yellow">
+                <ProgressBar IsIndeterminate="True"
+                             HorizontalAlignment="Center"
+                             Height="12"
+                             Width="40"/>
+            </Border>
+        </DataTemplate>
+        <Style TargetType="{x:Type ListView}"
+               x:Key="BaseStyle">
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <local:UniformInfiniteScrollableVirtualizingStackPanel
+                            ContainerHeight="40"
+                            Command="{Binding LoadCommand}"
+                            LoadingTemplate="{StaticResource LoadingTemplate}"/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsGrouping" Value="True">
+                    <Setter Property="ItemsPanel">
+                        <Setter.Value>
+                            <ItemsPanelTemplate>
+                                <StackPanel/>
+                            </ItemsPanelTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="{x:Type ListView}"
+               x:Key="ListStyle"
+               BasedOn="{StaticResource BaseStyle}">
+            <Setter Property="ItemsSource" Value="{Binding Source={StaticResource Jokes}}"/>
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate DataType="{x:Type local:Joke}">
+                        <Viewbox>
+                            <TextBlock>
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0} -> {1}">
+                                        <Binding Path="Setup"/>
+                                        <Binding Path="Punchline"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </Viewbox>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ListView"
+               x:Key="GridStyle"
+               BasedOn="{StaticResource BaseStyle}">
+            <Setter Property="ItemsSource" Value="{Binding Source={StaticResource Jokes}}"/>
+            <Setter Property="View">
+                <Setter.Value>
+                    <GridView>
+                        <GridViewColumn Header="Setup" DisplayMemberBinding="{Binding Setup}"/>
+                        <GridViewColumn Header="Punchline" DisplayMemberBinding="{Binding Punchline}"/>
+                    </GridView>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ListView"
+               x:Key="GroupedStyle"
+               BasedOn="{StaticResource BaseStyle}">
+            <Setter Property="ItemsSource" Value="{Binding Source={StaticResource GroupedJokes}}"/>
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate DataType="{x:Type local:Joke}">
+                        <Viewbox>
+                            <TextBlock>
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0} -> {1}">
+                                        <Binding Path="Setup"/>
+                                        <Binding Path="Punchline"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </Viewbox>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <GroupStyle x:Key="GroupStyle">
+            <GroupStyle.HeaderTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Name}" Background="LightBlue"/>
+                </DataTemplate>
+            </GroupStyle.HeaderTemplate>
+        </GroupStyle>
+    </Window.Resources>
+    <ListView x:Name="JokeList"
+              Style="{StaticResource GroupedStyle}">
+        <ListView.GroupStyle>
+            <StaticResource ResourceKey="GroupStyle"/>
+        </ListView.GroupStyle>
+        <ListView.InputBindings>
+            <KeyBinding Key="Delete"
+                    Command="{Binding RemoveCommand}"
+                    CommandParameter="{Binding SelectedItem, ElementName=JokeList}"/>
+            <KeyBinding Key="Delete" Modifiers="Ctrl"
+                    Command="{Binding ClearCommand}"/>
+            <KeyBinding Key="R"
+                    Command="{Binding UpdateCommand}"
+                    CommandParameter="{Binding SelectedItem, ElementName=JokeList}"/>
+            <KeyBinding Key="E"
+                    Command="{Binding MoveUpCommand}"
+                    CommandParameter="{Binding SelectedItem, ElementName=JokeList}"/>
+            <KeyBinding Key="D"
+                    Command="{Binding MoveDownCommand}"
+                    CommandParameter="{Binding SelectedItem, ElementName=JokeList}"/>
+        </ListView.InputBindings>
+    </ListView>
+</Window>
