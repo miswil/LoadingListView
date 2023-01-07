@@ -111,10 +111,23 @@
                     <TextBlock Text="{Binding Name}" Background="LightBlue"/>
                 </DataTemplate>
             </GroupStyle.HeaderTemplate>
+            <GroupStyle.Panel>
+                <ItemsPanelTemplate>
+                    <local:UniformInfiniteScrollableVirtualizingStackPanel
+                            ContainerHeight="40"
+                            Command="{Binding LoadCommand}"
+                            LoadingTemplate="{StaticResource LoadingTemplate}"/>
+                </ItemsPanelTemplate>
+            </GroupStyle.Panel>
         </GroupStyle>
     </Window.Resources>
     <ListView x:Name="JokeList"
               Style="{StaticResource GroupedStyle}">
+        <ListView.ItemContainerStyle>
+            <Style TargetType="ListViewItem">
+                <Setter Property="Height" Value="40"/>
+            </Style>
+        </ListView.ItemContainerStyle>
         <ListView.GroupStyle>
             <StaticResource ResourceKey="GroupStyle"/>
         </ListView.GroupStyle>

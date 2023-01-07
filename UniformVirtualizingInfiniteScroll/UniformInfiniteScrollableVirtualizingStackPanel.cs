@@ -14,7 +14,6 @@ namespace UniformVirtualizingInfiniteScroll
         private Size _viewPort = new Size(0.0, 0.0);
         private Point _offset = new Point(0.0, 0.0);
         private ContentControl? _contentControl;
-        private bool _isLoading;
 
         public double ContainerHeight
         {
@@ -60,31 +59,41 @@ namespace UniformVirtualizingInfiniteScroll
             var itemsControl = ItemsControl.GetItemsOwner(this);
             var items = itemsControl.Items;
             var isGrouping = itemsControl.IsGrouping;
-            if (isGrouping)
-            {
-                throw new NotSupportedException();
-            }
             var scroll = this.ScrollOwner;
             if (this.ItemContainerGenerator is null)
             {
                 // Touching Children is necessary to generate ItemContainerGenerator
                 _ = this.Children;
             }
-            if (this._viewPort != constraint)
+            if (isGrouping)
             {
-                this._viewPort = constraint;
-                scroll?.InvalidateScrollInfo();
+                this.PrepareVisibleChildren(0, items.Count + 1);
+                if (scroll != null &&
+                    (this._viewPort.Height != scroll.ViewportHeight ||
+                    this._viewPort.Width != scroll.ViewportWidth))
+                {
+                    this._viewPort = new Size(scroll.ViewportWidth, scroll.ViewportHeight);
+                    scroll?.InvalidateScrollInfo();
+                }
             }
-            var extentHeight = (items.Count + 1) * this.ContainerHeight;
-            var visibleRange = this.CalculateVisibleItemIndex();
-            this.PrepareVisibleChildren(visibleRange.first, visibleRange.last);
+            else
+            {
+                if (this._viewPort != constraint)
+                {
+                    this._viewPort = constraint;
+                    scroll?.InvalidateScrollInfo();
+                }
+                var visibleRange = this.CalculateVisibleItemIndex();
+                this.PrepareVisibleChildren(visibleRange.first, visibleRange.last);
+            }
             var maxWidth = 0.0;
             for (int i = 0; i < this.InternalChildren.Count; i++)
             {
                 var child = this.InternalChildren[i];
-                child.Measure(new Size(double.PositiveInfinity, this.ContainerHeight));
+                child.Measure(new Size(double.PositiveInfinity, isGrouping ? constraint.Height : this.ContainerHeight));
                 maxWidth = Math.Max(maxWidth, child.DesiredSize.Width);
             }
+            var extentHeight = (items.Count + 1) * this.ContainerHeight;
             var extent = new Size(maxWidth, extentHeight);
             if (this._extent != extent)
             {
@@ -96,23 +105,27 @@ namespace UniformVirtualizingInfiniteScroll
             {
                 this.SetVerticalOffset(this._offset.Y - vacant);
             }
-            return new Size(maxWidth, constraint.Height);
+            return new Size(maxWidth, isGrouping ? extentHeight : constraint.Height);
         }
 
         protected override Size ArrangeOverride(Size arrangeBounds)
         {
             var itemsControl = ItemsControl.GetItemsOwner(this);
-            var firstOffset = this._offset.Y % this.ContainerHeight;
+            var isGrouping = itemsControl.IsGrouping;
+            var firstOffset = isGrouping ? 0.0 : this._offset.Y % this.ContainerHeight;
             var childHeightSum = 0.0;
             for (int i = 0; i < this.InternalChildren.Count; i++)
             {
                 var child = this.InternalChildren[i];
                 child.Arrange(new Rect(
                     new Point(-this._offset.X, childHeightSum - firstOffset),
-                    new Size(arrangeBounds.Width, this.ContainerHeight)));
+                    new Size(arrangeBounds.Width, isGrouping ? child.DesiredSize.Height : this.ContainerHeight)));
                 childHeightSum += child.RenderSize.Height;
             }
-            if (this._isLoading)
+
+            if (isGrouping ?
+                childHeightSum - this.ContainerHeight - ViewportHeight <= this.VerticalOffset:
+                this._contentControl != null)
             {
                 this.Dispatcher.BeginInvoke(() =>
                 {
@@ -137,8 +150,8 @@ namespace UniformVirtualizingInfiniteScroll
         private void PrepareVisibleChildren(int firstIndex, int lastIndex)
         {
             var itemsControl = ItemsControl.GetItemsOwner(this);
+            var isGrouping = itemsControl.IsGrouping;
             var items = itemsControl.Items;
-            this._isLoading = items.Count < lastIndex;
             var generator = this.ItemContainerGenerator;
             var firstPosition = generator.GeneratorPositionFromIndex(firstIndex);
             var childIndex = firstPosition.Offset == 0 ? firstPosition.Index : firstPosition.Index + 1;
@@ -153,7 +166,8 @@ namespace UniformVirtualizingInfiniteScroll
                         isNewlyRealized = this._contentControl is null;
                         child = this._contentControl ??= new ContentControl
                         {
-                            ContentTemplate = this.LoadingTemplate
+                            ContentTemplate = this.LoadingTemplate,
+                            Height = this.ContainerHeight,
                         };
                     }
                     else
@@ -177,7 +191,9 @@ namespace UniformVirtualizingInfiniteScroll
                     }
                     else
                     {
-                        if (child != this.InternalChildren[childIndex])
+                        if ((!isGrouping || (child != null && childIndex < this.InternalChildren.Count))
+                            &&
+                            child != this.InternalChildren[childIndex])
                         {
                             this.InsertInternalChild(childIndex, child);
                         }
@@ -189,13 +205,17 @@ namespace UniformVirtualizingInfiniteScroll
 
         private void CleanUpWasteChildren(int firstIndex, int lastIndex)
         {
-            if (!this._isLoading && this._contentControl is not null)
+            var itemsControl = ItemsControl.GetItemsOwner(this);
+            var isGrouping = itemsControl.IsGrouping;
+            var items = itemsControl.Items;
+            var loadingUnnecessary = items.Count >= lastIndex;
+            if (loadingUnnecessary && this._contentControl is not null)
             {
                 this._contentControl = null;
                 this.RemoveInternalChildRange(this.InternalChildren.Count - 1, 1);
                 lastIndex--;
             }
-            var generatedItemsCount = this._isLoading ? this.InternalChildren.Count - 2 : this.InternalChildren.Count - 1;
+            var generatedItemsCount = loadingUnnecessary ? this.InternalChildren.Count - 1 : this.InternalChildren.Count - 2;
             var generator = this.ItemContainerGenerator;
             for (int i = generatedItemsCount; i >= 0; --i)
             {
@@ -223,7 +243,7 @@ namespace UniformVirtualizingInfiniteScroll
                     RemoveInternalChildRange(args.OldPosition.Index, args.ItemUICount);
                     break;
                 case NotifyCollectionChangedAction.Reset:
-                    if (this._isLoading)
+                    if (this._contentControl != null)
                     {
                         AddInternalChild(this._contentControl);
                     }
